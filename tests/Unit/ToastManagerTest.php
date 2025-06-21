@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit;
+namespace Vsent\LaravelToastify\Tests\Unit; // Updated Namespace
 
-use App\Toastify\Contracts\ToastManagerContract;
-use App\Toastify\DTOs\ToastMessageDTO;
-use App\Toastify\Events\ToastCreated;
-use App\Toastify\ToastManager;
+use Vsent\LaravelToastify\Contracts\ToastManagerContract; // Updated Namespace
+use Vsent\LaravelToastify\DTOs\ToastMessageDTO;         // Updated Namespace
+use Vsent\LaravelToastify\Events\ToastCreated;          // Updated Namespace
+use Vsent\LaravelToastify\ToastManager;                 // Updated Namespace
 use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Events\Dispatcher as EventDispatcher;
 use Illuminate\Contracts\Session\Session;
@@ -15,11 +15,30 @@ use Illuminate\Log\LogManager;
 use Illuminate\Support\Facades\Event; // For event faking
 use Mockery; // For mocking dependencies
 use Mockery\MockInterface;
+use Carbon\CarbonImmutable; // Often useful for date testing
 
 // Helper function to get a mocked ToastManager instance
-function create_toast_manager_instance(array $configOverrides = [], ?Session $session = null): ToastManager
+function create_toast_manager_instance_for_test(array $configOverrides = [], ?Session $session = null): ToastManager // Renamed helper
 {
-    $defaultConfig = include __DIR__ . '/../../config/toasts.php'; // Assuming config is in project root
+    // For package unit tests, we should load the package's default config.
+    // This path assumes the tests directory is a sibling of src, and config is a sibling of src.
+    $packageConfigPath = __DIR__ . '/../../config/toasts.php'; // Path to the package's default config
+
+    if (!file_exists($packageConfigPath)) {
+         // Fallback to a minimal dummy config if the package's default config isn't found at expected path during testing
+        $defaultConfig = [
+            'session_key' => 'laravel_toastify_messages',
+            'types' => ['defaults' => ['duration' => 5000], 'success' => ['bg' => 'bg-green-test']],
+            'display' => ['default_duration' => 5000],
+            'sounds' => ['global' => ['enabled' => false, 'base_path' => 'sounds/toastify'], 'assets' => [], 'types' => []],
+            'queue' => ['priority' => ['enabled' => false, 'levels' => []], 'max_toasts' => 5],
+            'animations' => ['presets' => ['fade' => []], 'global' => [], 'preset' => 'fade'],
+            'behavior' => [], 'close_button' => [], 'progress_bar' => [],
+        ];
+    } else {
+        $defaultConfig = include $packageConfigPath;
+    }
+
     $configData = array_replace_recursive($defaultConfig, $configOverrides);
 
     $mockConfig = Mockery::mock(ConfigRepository::class);

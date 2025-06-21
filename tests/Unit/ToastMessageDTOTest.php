@@ -2,15 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit; // Adjusted to standard Laravel test namespace
-// Assuming your package code is under App\Toastify, so for testing it's fine.
-// If this were a standalone package, it would be DevBuddy\LaravelToastify\Tests\Unit
+namespace Vsent\LaravelToastify\Tests\Unit; // Updated Namespace
 
-use App\Toastify\DTOs\ToastMessageDTO;
+use Vsent\LaravelToastify\DTOs\ToastMessageDTO; // Updated Namespace
 use Carbon\CarbonImmutable; // Using Carbon for easier date manipulation in tests
 
 // Helper function to create a valid base DTO for tests
-function create_default_toast_data(array $overrides = []): array
+function create_default_toast_data_for_dto_test(array $overrides = []): array // Renamed helper
 {
     $now = CarbonImmutable::now();
     return array_merge([

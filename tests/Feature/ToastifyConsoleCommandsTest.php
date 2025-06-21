@@ -1,24 +1,33 @@
 <?php
 
-namespace Tests\Feature;
+namespace Vsent\LaravelToastify\Tests\Feature; // Updated Namespace
 
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
-use App\Toastify\ToastServiceProvider; // To reference in call()
+use Vsent\LaravelToastify\ToastServiceProvider; // Updated Namespace
 
 beforeEach(function () {
-    // Ensure the dummy config file exists for the install command to "publish" from
-    $configDir = __DIR__ . '/../../config';
-    $configFile = $configDir . '/toasts.php';
-    if (!file_exists($configFile)) {
-        if (!is_dir($configDir)) {
-            mkdir($configDir, 0777, true);
+    // For these tests, we are testing the application's interaction with the package's commands.
+    // The commands will attempt to publish the package's config.
+    // We need to ensure a "source" config exists for the service provider to reference.
+    // This path assumes 'config' is a sibling to 'src', and 'tests' is a sibling to 'src'.
+    // So, __DIR__ (tests/Feature) -> ../ (tests) -> ../ (package root) -> config/toasts.php
+    $packageConfigSourceDir = __DIR__ . '/../../config';
+    $packageConfigSourceFile = $packageConfigSourceDir . '/toasts.php';
+
+    if (!file_exists($packageConfigSourceFile)) {
+        if (!is_dir($packageConfigSourceDir)) {
+            // This would typically be part of your package structure, not created by test.
+            // For testing, we ensure it exists if the test runner is in a context where it's missing.
+            // In a real package test setup with Orchestra, this might be handled by testbench's file system.
+            mkdir($packageConfigSourceDir, 0777, true);
         }
-        $dummyConfigContent = "<?php return ['session_key' => 'toastify_messages'];"; // Minimal
-        file_put_contents($configFile, $dummyConfigContent);
+        // A minimal config that the service provider can "load" and "publish"
+        $dummyConfigContent = "<?php return ['session_key' => 'laravel_toastify_messages_default_test_val'];";
+        file_put_contents($packageConfigSourceFile, $dummyConfigContent);
     }
 
-    // Mock the necessary File facade methods
+    // Mock the necessary File facade methods for assertions on what the commands *do* in the app space
     File::shouldReceive('exists')->andReturn(false)->byDefault(); // Default to not existing
     File::shouldReceive('isDirectory')->andReturn(false)->byDefault();
     File::shouldReceive('delete')->andReturn(true)->byDefault();

@@ -1,19 +1,22 @@
 <?php
 
-namespace Tests\Feature; // Standard Laravel feature test namespace
+namespace Vsent\LaravelToastify\Tests\Feature; // Updated Namespace
 
-use App\Toastify\Contracts\ToastManagerContract;
-use App\Toastify\DTOs\ToastMessageDTO;
-use App\Toastify\Http\Livewire\ToastContainer;
-use App\Toastify\ToastManager; // Using the concrete class for mocking some internal behavior if needed
+use Vsent\LaravelToastify\Contracts\ToastManagerContract; // Updated Namespace
+use Vsent\LaravelToastify\DTOs\ToastMessageDTO;         // Updated Namespace
+use Vsent\LaravelToastify\Http\Livewire\ToastContainer; // Updated Namespace
+// No need to use Vsent\LaravelToastify\ToastManager directly in this feature test, contract is enough
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Session;
 use Livewire\Livewire; // Livewire test helper
 use Mockery;
 use Carbon\CarbonImmutable;
 
-// Helper to create DTOs for testing
-function create_test_dto(string $id, string $message, array $overrides = []): ToastMessageDTO
+// Helper to create DTOs for testing (can be kept global for tests or namespaced)
+// To avoid conflicts if other tests define it, let's make it specific or ensure it's only defined once.
+// For this refactor, assuming it's fine as is if this is the only definition.
+// Or rename: function create_toastify_test_dto(...)
+function create_test_dto_for_container(string $id, string $message, array $overrides = []): ToastMessageDTO
 {
     $defaults = [
         'id' => $id,

@@ -1,0 +1,75 @@
+{
+    "name": "vsent/laravel-toastify",
+    "description": "A dynamic toast notification system for Laravel using Livewire, Tailwind CSS, and Alpine.js.",
+    "keywords": [
+        "laravel",
+        "livewire",
+        "toast",
+        "notifications",
+        "tailwindcss",
+        "alpinejs",
+        "vsent"
+    ],
+    "type": "laravel-package",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Vsent (Originally DevBuddy AI)",
+            "email": "your-email@example.com"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/contracts": "^11.0|^12.0",
+        "illuminate/support": "^11.0|^12.0",
+        "illuminate/session": "^11.0|^12.0",
+        "illuminate/config": "^11.0|^12.0",
+        "illuminate/events": "^11.0|^12.0",
+        "illuminate/console": "^11.0|^12.0",
+        "illuminate/view": "^11.0|^12.0",
+        "livewire/livewire": "^3.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0|^10.0",
+        "pestphp/pest": "^2.0|^3.0",
+        "pestphp/pest-plugin-laravel": "^2.0",
+        "laravel/pint": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Vsent\\LaravelToastify\\": "src/"
+        },
+        "files": [
+            "src/helpers.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Vsent\\LaravelToastify\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Vsent\\LaravelToastify\\ToastServiceProvider"
+            ],
+            "aliases": {
+                "Toastify": "Vsent\\LaravelToastify\\Facades\\Toastify"
+            }
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/pest",
+        "test-coverage": "vendor/bin/pest --coverage",
+        "format": "vendor/bin/pint"
+    }
+}

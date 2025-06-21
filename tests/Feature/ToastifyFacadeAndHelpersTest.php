@@ -1,30 +1,29 @@
 <?php
 
-namespace Tests\Feature;
+namespace Vsent\LaravelToastify\Tests\Feature; // Updated Namespace
 
-use App\Toastify\Contracts\ToastManagerContract;
-use App\Toastify\DTOs\ToastMessageDTO;
-use App\Toastify\Facades\Toastify; // Import the Facade
+use Vsent\LaravelToastify\Contracts\ToastManagerContract; // Updated Namespace
+use Vsent\LaravelToastify\DTOs\ToastMessageDTO;         // Updated Namespace
+use Vsent\LaravelToastify\Facades\Toastify;             // Updated Namespace
 use Illuminate\Support\Facades\Config;
 use Mockery;
 use Mockery\MockInterface;
 
-// Ensure helpers are loaded for testing.
-// Usually, Composer handles this, but in a test environment, explicitly requiring can be necessary
-// if the test isn't bootstrapping the full app in a way that loads `files` autoload.
-// However, for Laravel feature tests, helpers are typically available.
-// require_once __DIR__ . '/../../app/Toastify/helpers.php'; // Not usually needed for Pest feature tests
+// For feature tests, Laravel's bootstrap process should make helpers available if they are
+// correctly autoloaded by the package's composer.json (which they will be via "files" autoload).
+// So, no explicit require_once should be needed here.
 
 beforeEach(function () {
     // Mock the ToastManagerContract implementation
     $this->toastManagerMock = Mockery::mock(ToastManagerContract::class);
     // Replace the service container binding with our mock
+    // This binding key 'toastify.manager' must match what the Facade uses
+    // and what the ServiceProvider registers as an alias.
     $this->app->instance('toastify.manager', $this->toastManagerMock);
-    // Or if Facade uses Contract class directly:
-    // $this->app->instance(ToastManagerContract::class, $this->toastManagerMock);
 
-    // Minimal config for DTO creation in mock returns
-    Config::set('toasts.types.defaults.duration', 5000); // Example default
+    // Minimal config for DTO creation in mock returns, or if helpers rely on config defaults
+    // This assumes the main app's config would have this after package is installed and config published/merged.
+    Config::set('toasts.types.defaults.duration', 5000);
 });
 
 afterEach(function () {

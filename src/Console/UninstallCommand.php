@@ -2,97 +2,63 @@
 
 declare(strict_types=1);
 
-namespace Vsent\ToastMessages\Console;
+namespace Vsent\LaravelToastify\Console; // Updated Namespace
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
-/**
- * Class UninstallCommand
- *
- * @package VsE\ToastMessages\Console
- *
- * This Artisan command facilitates the clean uninstallation of the VsE ToastMessages package.
- * It removes the published configuration, views, and public assets (sounds).
- * It provides a guided interactive experience for the uninstallation process.
- *
- * This version is updated to reflect the new `config/toasts.php` file name.
- */
-class UninstallCommand extends Command
+class UninstallCommand extends Command // Renamed Class
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
-    protected $signature = 'toasts:uninstall'; // Updated signature
+    protected $signature = 'toastify:uninstall';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Uninstalls the VsE ToastMessages package: Removes published config, views, and assets.';
+    protected $description = 'Uninstall Laravel Toastify: Remove published configuration, views, and assets.'; // Updated Description
 
-    /**
-     * Execute the console command.
-     *
-     * This method contains the main logic for the uninstallation process.
-     *
-     * @return int
-     */
     public function handle(): int
     {
-        $this->info('Starting VsE ToastMessages uninstallation...');
-
-        if (!$this->confirm('Are you sure you want to uninstall VsE ToastMessages and remove ALL published files? This action cannot be undone.', false)) {
-            $this->info('Uninstallation cancelled.');
-            return Command::CANCEL;
+        if (!$this->confirm('Are you sure you want to uninstall Laravel Toastify? This will remove published files (config, views, assets).', false)) {
+            $this->info('Laravel Toastify uninstallation cancelled.');
+            return Command::INVALID;
         }
 
-        // 1. Remove Configuration
-        $configPath = config_path('toasts.php'); // Updated path
+        $this->info('Uninstalling Laravel Toastify...');
+
+        // Remove configuration
+        $configPath = config_path('toasts.php');
         if (File::exists($configPath)) {
-            if ($this->confirm(sprintf('Remove config file: %s?', $configPath), true)) {
+            if ($this->confirm("Remove configuration file? ({$configPath})", true)) {
                 File::delete($configPath);
-                $this->info('Configuration file removed.');
-            } else {
-                $this->warn('Skipping config file removal.');
+                $this->info("Removed: {$configPath}");
             }
         } else {
-            $this->comment('Config file not found, skipping removal.');
+            $this->comment("Configuration file not found: {$configPath}");
         }
 
-        // 2. Remove Views
-        $viewsPath = resource_path('views/vendor/toast-messages');
+        // Remove views
+        $viewsPath = resource_path('views/vendor/laravel-toastify'); // Updated Path
         if (File::isDirectory($viewsPath)) {
-            if ($this->confirm(sprintf('Remove views directory: %s?', $viewsPath), true)) {
+            if ($this->confirm("Remove views directory? ({$viewsPath})", true)) {
                 File::deleteDirectory($viewsPath);
-                $this->info('Views directory removed.');
-            } else {
-                $this->warn('Skipping views directory removal.');
+                $this->info("Removed: {$viewsPath}");
             }
         } else {
-            $this->comment('Views directory not found, skipping removal.');
+            $this->comment("Views directory not found: {$viewsPath}");
         }
 
-        // 3. Remove Public Assets (Sounds)
-        $assetsPath = public_path('vendor/toast-messages/sounds');
+        // Remove assets
+        $assetsPath = public_path('vendor/vsent/laravel-toastify/sounds'); // Updated Path
         if (File::isDirectory($assetsPath)) {
-            if ($this->confirm(sprintf('Remove public assets directory: %s?', $assetsPath), true)) {
+            if ($this->confirm("Remove assets directory? ({$assetsPath})", true)) {
                 File::deleteDirectory($assetsPath);
-                $this->info('Public assets directory removed.');
-            } else {
-                $this->warn('Skipping public assets directory removal.');
+                $this->info("Removed: {$assetsPath}");
             }
         } else {
-            $this->comment('Public assets directory not found, skipping removal.');
+            $this->comment("Assets directory not found: {$assetsPath}");
         }
 
-        $this->newLine();
-        $this->comment('VsE ToastMessages uninstallation complete!');
-        $this->newLine();
-        $this->warn('Remember to remove `<livewire:toast-messages />` from your Blade layouts and `vse/toast-messages` from your composer.json.');
+        $this->info('Laravel Toastify uninstallation process complete.');
+        $this->line('Remember to remove the service provider `Vsent\LaravelToastify\ToastServiceProvider` from your `config/app.php` if it was manually registered and not auto-discovered.');
+        $this->line('Also, remove the facade alias for `Toastify` from `config/app.php` if manually added.');
+        $this->line('Finally, remove the `<livewire:toastify-container />` component from your layouts and `composer remove vsent/laravel-toastify`.');
 
         return Command::SUCCESS;
     }

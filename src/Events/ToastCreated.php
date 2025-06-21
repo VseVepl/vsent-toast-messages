@@ -2,50 +2,51 @@
 
 declare(strict_types=1);
 
-namespace Vsent\ToastMessages\Events;
+namespace Vsent\LaravelToastify\Events; // Updated Namespace
 
+use Vsent\LaravelToastify\DTOs\ToastMessageDTO; // Updated Namespace for DTO
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
-use Vsent\ToastMessages\DTOs\ToastMessageDTO;
 
 /**
- * Class ToastCreated
+ * Event dispatched when a new toast message is created by the ToastManager.
  *
- * @package VsE\ToastMessages\Events
- *
- * This event is dispatched whenever a new toast notification is created by the ToastManager.
- * It allows other parts of the application (e.g., listeners for logging, analytics,
- * or custom integrations) to react to toast creation without coupling directly
- * to the ToastManager's internal logic.
+ * This event allows other parts of the application to react to toast creation,
+ * for example, for logging, analytics, or triggering other actions.
  */
 class ToastCreated
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     /**
-     * The ToastMessageDTO instance that was just created.
+     * The ToastMessageDTO instance representing the newly created toast.
      *
-     * This property is public readonly, meaning it can be accessed directly
-     * by listeners but cannot be modified after the event object is created.
-     *
-     * @param ToastMessageDTO $toast The data transfer object representing the new toast.
+     * This property is public readonly, ensuring it can be accessed by listeners
+     * but not modified after the event object is instantiated.
      */
-    public function __construct(
-        public readonly ToastMessageDTO $toast
-    ) {}
+    public readonly ToastMessageDTO $toast;
 
     /**
-     * Get the channels the event should broadcast on.
-     * (Optional: For Livewire, typically not needed for a simple toast event,
-     * but included for standard Laravel event structure if broadcasting is desired).
+     * Create a new event instance.
      *
-     * @return array<int, \Illuminate\Broadcasting\Channel>
+     * @param ToastMessageDTO $toast The DTO of the toast message that was created.
      */
+    public function __construct(ToastMessageDTO $toast)
+    {
+        $this->toast = $toast;
+    }
+
+    // If broadcasting is needed in the future:
+    // /**
+    //  * Get the channels the event should broadcast on.
+    //  *
+    //  * @return array<int, \Illuminate\Broadcasting\Channel|\Illuminate\Database\Eloquent\Model>
+    //  */
     // public function broadcastOn(): array
     // {
     //     return [
-    //         // new PrivateChannel('channel-name'),
+    //         // new \Illuminate\Broadcasting\PrivateChannel('channel-name'),
     //     ];
     // }
 }

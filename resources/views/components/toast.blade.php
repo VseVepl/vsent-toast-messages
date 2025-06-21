@@ -1,205 +1,221 @@
-{{-- resources/views/components/toast.blade.php --}}
 {{--
-    This Blade partial renders a single toast message.
-    It takes a `ToastMessageDTO` object and the global configuration as props.
-    It dynamically applies Tailwind CSS classes and Alpine.js directives
-    based on the toast's properties and the configuration.
---}}
+    Renders a single toast message.
+    Located at: your-package-root/resources/views/components/toast.blade.php
+    Included by: 'laravel-toastify::toast-list'
 
+    The `toast` variable here is from the Alpine.js x-for scope in toast-list.blade.php.
+    The `config` variable is passed down from toast-list.blade.php.
+--}}
 <div
     x-data="{
-        {{-- Initialize Alpine.js state for this individual toast --}}
-        toastId: '{{ $toast->id }}',
-        duration: {{ $toast->duration }},
-        autoDismiss: {{ json_encode($toast->autoDismiss) }},
-        showProgressBar: {{ json_encode($toast->showProgressBar) }},
-        progressBarEnabled: {{ json_encode($config['progress_bar']['enabled'] ?? false) }},
-        pauseOnHover: {{ json_encode($toast->pauseOnHover) }},
-        pauseOnWindowBlur: {{ json_encode($config['behavior']['pause_on_window_blur'] ?? true) }},
-        dismissed: false,
-        timeoutId: null,
+        toastData: toast,
+        mainConfig: config,
+
+        id: toast.id,
+        duration: parseInt(toast.duration),
+        autoDismiss: toast.autoDismiss,
+        showProgressBar: toast.showProgressBar && (config.progress_bar?.enabled ?? true) && parseInt(toast.duration) > 0,
+        pauseOnHover: toast.pauseOnHover && (config.behavior?.pause_on_hover ?? true),
+        pauseOnWindowBlur: config.behavior?.pause_on_window_blur ?? true,
+
+        timerId: null,
+        remainingTime: parseInt(toast.duration),
+        isPaused: false,
+        timerStartedAt: null,
         progressBarWidth: 100,
-        progressBarAnimationDuration: '{{ $toast->duration }}ms',
-        createdAt: new Date('{{ $toast->createdAt->format(\DateTimeInterface::ATOM) }}'),
-        remainingTime: {{ $toast->duration }}, {{-- In milliseconds --}}
-        timerStartedAt: Date.now(),
 
-        {{--
-            Initialize toast timer and event listeners.
-            This is called when the toast element is added to the DOM.
-        --}}
-        init() {
-            // Set CSS variable for progress bar animation duration
-            this.$el.style.setProperty('--toast-duration', this.duration + 'ms');
-
+        initToast() {
             if (this.autoDismiss && this.duration > 0) {
                 this.startTimer();
-
                 if (this.pauseOnHover) {
                     this.$el.addEventListener('mouseenter', () => this.pauseTimer());
                     this.$el.addEventListener('mouseleave', () => this.resumeTimer());
                 }
-
                 if (this.pauseOnWindowBlur) {
-                    window.addEventListener('blur', () => this.pauseTimer());
-                    window.addEventListener('focus', () => this.resumeTimer());
+                    window.addEventListener('blur', () => this.pauseTimerOnBlur());
+                    window.addEventListener('focus', () => this.resumeTimerOnFocus());
                 }
             }
-
-            // Listen for Livewire navigation to clear toasts if configured
-            @if ($config['behavior']['clear_all_on_navigate'] ?? true)
-                document.addEventListener('livewire:navigate', () => {
-                    // This event is typically handled by the ToastContainer component,
-                    // but we can ensure individual toasts also react.
-                    // For now, relies on ToastContainer to manage the collection.
-                });
-            @endif
+            this.$el.style.setProperty('--toast-duration-ms', this.duration + 'ms');
         },
 
-        {{-- Start or restart the auto-dismiss timer --}}
         startTimer() {
-            if (this.timeoutId) {
-                clearTimeout(this.timeoutId);
+            if (this.timerId) clearTimeout(this.timerId);
+            if (this.remainingTime <= 0) {
+                if(this.autoDismiss) this.dismiss();
+                return;
             }
+            this.isPaused = false;
             this.timerStartedAt = Date.now();
-            this.timeoutId = setTimeout(() => {
-                this.dismissToast();
-            }, this.remainingTime);
-
-            this.updateProgressBar();
+            this.timerId = setTimeout(() => this.dismiss(), this.remainingTime);
+            this.animateProgressBar();
         },
 
-        {{-- Pause the auto-dismiss timer --}}
         pauseTimer() {
-            if (this.timeoutId) {
-                clearTimeout(this.timeoutId);
-                const elapsed = Date.now() - this.timerStartedAt;
-                this.remainingTime -= elapsed;
-                // Stop progress bar animation if it's running via CSS
-                this.$el.style.setProperty('--toast-paused', 'running'); // Using 'running' to effectively pause CSS animation
+            if (!this.autoDismiss || this.isPaused || this.remainingTime <= 0) return;
+            this.isPaused = true;
+            if (this.timerId) clearTimeout(this.timerId);
+            const elapsed = Date.now() - this.timerStartedAt;
+            this.remainingTime -= elapsed;
+            this.updateProgressBarWidth();
+            if (this.$refs.progressBarInner) {
+                this.$refs.progressBarInner.style.transitionDuration = '0ms';
+                this.$refs.progressBarInner.style.width = this.progressBarWidth + '%';
             }
         },
 
-        {{-- Resume the auto-dismiss timer --}}
         resumeTimer() {
-            if (this.autoDismiss && this.duration > 0 && this.remainingTime > 0) {
-                this.$el.style.setProperty('--toast-paused', 'paused'); // Using 'paused' to resume CSS animation
-                this.startTimer();
+            if (!this.autoDismiss || !this.isPaused || this.remainingTime <= 0) return;
+            this.isPaused = false;
+            this.startTimer();
+        },
+
+        pauseTimerOnBlur() {
+            if (this.pauseOnWindowBlur && !this.isPaused) this.pauseTimer();
+        },
+        resumeTimerOnFocus() {
+            if (this.pauseOnWindowBlur && this.isPaused) {
+                if (this.pauseOnHover && this.$el.matches(':hover')) return;
+                this.resumeTimer();
             }
         },
 
-        {{-- Update the progress bar width based on remaining time --}}
-        updateProgressBar() {
-            if (this.showProgressBar && this.progressBarEnabled) {
-                // The CSS animation for the progress bar will handle the actual width.
-                // We just need to ensure the duration variable is set.
-                // This function is mostly a placeholder for starting the CSS animation.
+        updateProgressBarWidth() {
+            if (!this.showProgressBar) return;
+            this.progressBarWidth = (this.duration <= 0) ? 100 : Math.max(0, (this.remainingTime / this.duration) * 100);
+        },
+
+        animateProgressBar() {
+            if (!this.showProgressBar || !this.$refs.progressBarInner) return;
+            this.$refs.progressBarInner.style.transitionDuration = '0ms';
+            this.$refs.progressBarInner.style.width = this.progressBarWidth + '%';
+            void this.$refs.progressBarInner.offsetWidth;
+            this.$refs.progressBarInner.style.transitionProperty = 'width';
+            this.$refs.progressBarInner.style.transitionTimingFunction = this.mainConfig.progress_bar?.transition?.timing || 'linear';
+            this.$refs.progressBarInner.style.transitionDuration = this.remainingTime + 'ms';
+            this.$refs.progressBarInner.style.width = '0%';
+        },
+
+        dismiss() {
+            if (this.timerId) clearTimeout(this.timerId);
+            this.$wire.dismiss(this.id); // Call Livewire component method
+
+            const dismissSoundAssetKey = this.mainConfig.sounds?.assets?.dismiss?.src ? 'dismiss' : null;
+            if (dismissSoundAssetKey && this.mainConfig.sounds?.global?.enabled) {
+                 const dismissSoundConfig = this.mainConfig.sounds.assets[dismissSoundAssetKey];
+                 const soundBase = (this.mainConfig.sounds.global.base_path || 'sounds/toastify').replace(/^\/+|\/+$/g, '');
+                 const soundSrc = dismissSoundConfig.src.replace(/^\/+|\/+$/g, '');
+                 const dismissSoundPath = `/${soundBase}/${soundSrc}`;
+                 this.$dispatch('play-sound-event', { path: dismissSoundPath, volume: dismissSoundConfig.volume, loop: dismissSoundConfig.loop });
             }
         },
 
-        {{-- Dismiss the toast programmatically or via user interaction --}}
-        dismissToast() {
-            this.dismissed = true;
-            if (this.timeoutId) {
-                clearTimeout(this.timeoutId);
+        handleAction(handler, actionData = {}) { // Added actionData for potential future use
+            if (!handler) return;
+            if (handler.startsWith('Livewire.dispatch')) {
+                const eventNameWithParams = handler.substring('Livewire.dispatch'.length).trim().slice(1, -1); // Get content like 'event-name', {id:1}
+                const [eventName, paramsString] = eventNameWithParams.split(/,(.+)/s);
+                const finalEventName = eventName.replace(/['"]/g, '');
+                let finalParams = {};
+                if (paramsString) {
+                    try { finalParams = JSON.parse(paramsString.trim()); } catch (e) { console.error('Laravel Toastify: Invalid JSON in action params', paramsString, e); }
+                }
+                Livewire.dispatch(finalEventName, finalParams);
+            } else if (handler.startsWith('$wire.')) {
+                // For $wire.call('method', param1, param2) or $wire.method(param1)
+                // This needs careful parsing if not simple.
+                // A safer way is to always use Livewire.dispatch or specific $wire.call from config.
+                // For simplicity, assuming simple $wire.methodName or $wire.call('methodName', ...argsFromToastData)
+                const callMatch = handler.match(/\$wire\.call\(['"]([^'"]+)['"](?:,\s*([^)]+))?\)/) || handler.match(/\$wire\.([^'(]+)(?:\(([^)]*)\))?/);
+                if (callMatch) {
+                    const method = callMatch[1];
+                    let args = [this.id, this.toastData.customData]; // Default args
+                    // Very basic arg parsing for $wire.call('method', 'stringArg', 123) - not robust for complex objects
+                    if (callMatch[2]) {
+                        try { args = JSON.parse(`[${callMatch[2]}]`);}
+                        catch(e) { args = callMatch[2].split(',').map(s => s.trim().replace(/^['"]|['"]$/g, ''));}
+                    } else if (callMatch[3]) { // For $wire.method(args)
+                         try { args = JSON.parse(`[${callMatch[3]}]`);}
+                         catch(e) { args = callMatch[3].split(',').map(s => s.trim().replace(/^['"]|['"]$/g, ''));}
+                    }
+                    this.$wire.call(method, ...args);
+                } else {
+                     console.warn('Laravel Toastify: Could not parse $wire action handler:', handler);
+                }
+            } else if (typeof window[handler] === 'function') {
+                window[handler](this.toastData);
+            } else {
+                this.$wire.call(handler, this.id, this.toastData.customData); // Default to Livewire component method
             }
-            // Emit a Livewire event to inform the parent component to dismiss the toast
-            this.$wire.dismiss(this.toastId);
         }
     }"
-    {{-- Apply overall wrapper classes --}}
-    class="{{ $toast->layout['wrapper_classes'] ?? 'p-4 rounded-lg shadow-lg flex items-center space-x-4' }} {{ $toast->bgColor }} {{ $toast->textColor }} relative"
-    :class="{ 'hidden': dismissed }" {{-- Hide element when dismissed --}}
-    role="{{ $toast->ariaRole }}"
-    aria-live="{{ $toast->ariaRole === 'alert' ? 'assertive' : 'polite' }}"
-    tabindex="0" {{-- Make toast focusable for accessibility --}}>
-    {{-- Icon Wrapper --}}
-    @if ($toast->icon)
-    <div class="{{ $toast->layout['icon_wrapper_classes'] ?? 'flex-shrink-0' }}">
-        {!! $toast->icon !!}
-    </div>
-    @endif
-
-    {{-- Content Wrapper --}}
-    <div class="{{ $toast->layout['content_wrapper_classes'] ?? 'flex-grow' }}">
-        @if ($toast->title)
-        <h3 class="text-sm {{ $config['types']['defaults']['title_classes'] ?? 'font-semibold' }}">{{ $toast->title }}</h3>
-        @endif
-        <p class="text-sm {{ $config['types']['defaults']['message_classes'] ?? '' }}">{{ $toast->message }}</p>
-
-        {{-- Actions Section --}}
-        @if (!empty($toast->actions))
-        <div class="{{ $toast->layout['action_container_classes'] ?? 'flex justify-end space-x-2 mt-2' }}">
-            @foreach ($toast->actions as $action)
-            @php
-            $actionHandler = $action['handler'] ?? null;
-            $actionClasses = $action['classes'] ?? '';
-            @endphp
-            <button
-                type="button"
-                @if ($actionHandler)
-                @if (str_starts_with($actionHandler, 'Livewire.' )) {{-- Example: Livewire.dispatch('someEvent') --}}
-                x-on:click="{!! $actionHandler !!}"
-                @elseif (str_starts_with($actionHandler, 'this.' )) {{-- Example: this.dismissToast() --}}
-                x-on:click="{!! $actionHandler !!}"
-                @else {{-- Assume it's a Livewire component method --}}
-                wire:click="{{ $actionHandler }}"
-                @endif
-                @endif
-                class="{{ $actionClasses }}">
-                {{ $action['label'] }}
-            </button>
-            @endforeach
+    x-init="initToast()"
+    class="w-full pointer-events-auto"
+    :class="[toastData.layout?.wrapper_classes || mainConfig.types?.layouts?.default?.wrapper_classes || 'p-4 rounded-lg shadow-lg flex items-center space-x-3', toastData.bgColor, toastData.textColor]"
+    role="status"
+    :aria-live="toastData.ariaRole === 'alert' ? 'assertive' : 'polite'"
+    tabindex="0"
+>
+    <!-- Icon -->
+    <template x-if="toastData.icon">
+        <div :class="toastData.layout?.icon_wrapper_classes || mainConfig.types?.layouts?.default?.icon_wrapper_classes || 'flex-shrink-0'">
+            <div x-html="toastData.icon"></div>
         </div>
-        @endif
+    </template>
+
+    <!-- Content -->
+    <div :class="toastData.layout?.content_wrapper_classes || mainConfig.types?.layouts?.default?.content_wrapper_classes || 'flex-grow'">
+        <template x-if="toastData.title">
+            <h3 class="text-sm font-medium" x-text="toastData.title"></h3>
+        </template>
+        <p class="text-sm" x-html="toastData.message"></p>
+
+        <!-- Actions -->
+        <template x-if="toastData.actions && toastData.actions.length > 0">
+            <div :class="toastData.layout?.action_container_classes || mainConfig.types?.layouts?.[toastData.layout_preset || 'default']?.action_container_classes || 'flex justify-end space-x-2 mt-2'">
+                <template x-for="action in toastData.actions" :key="action.label">
+                    <button
+                        type="button"
+                        @click="handleAction(action.handler, action)"
+                        :class="action.classes || 'text-sm underline hover:opacity-75'"
+                        x-text="action.label"
+                    ></button>
+                </template>
+            </div>
+        </template>
     </div>
 
-    {{-- Close Button --}}
-    @if ($toast->closeButtonEnabled && ($config['close_button']['enabled'] ?? true))
-    <div class="{{ $config['close_button']['position_classes'] ?? 'absolute top-2 right-2' }}">
-        <{{ $config['close_button']['html_element'] ?? 'button' }}
-            type="button"
-            x-on:click="dismissToast()"
-            class="{{ $config['close_button']['base_classes'] ?? '' }} {{ $config['close_button']['size_classes'] ?? '' }} {{ $config['close_button']['color_classes'] ?? '' }} {{ $config['close_button']['hover_classes'] ?? '' }} {{ $config['close_button']['transition_classes'] ?? '' }}"
-            aria-label="{{ $config['close_button']['aria_label'] ?? 'Close notification' }}">
-            {!! $config['close_button']['icon'] ?? '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-            </svg>' !!}
-        </{{ $config['close_button']['html_element'] ?? 'button' }}>
-    </div>
-    @endif
+    <!-- Close Button -->
+    <template x-if="toastData.closeButtonEnabled && (mainConfig.close_button?.enabled ?? true)">
+        <div :class="mainConfig.close_button?.position_classes || 'ml-auto pl-3'">
+            <div class="-mx-1.5 -my-1.5">
+                 <button
+                    type="button"
+                    @click="dismiss()"
+                    :class="mainConfig.close_button?.base_classes + ' ' + mainConfig.close_button?.size_classes + ' ' + mainConfig.close_button?.color_classes + ' ' + mainConfig.close_button?.hover_classes + ' ' + mainConfig.close_button?.transition_classes || 'p-1.5 rounded-md focus:outline-none'"
+                    :aria-label="mainConfig.close_button?.aria_label || 'Close'"
+                >
+                    <span class="sr-only" x-text="mainConfig.close_button?.aria_label || 'Close'"></span>
+                    <div x-html="mainConfig.close_button?.icon || '<svg class=\"h-5 w-5\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" fill=\"currentColor\" aria-hidden=\"true\"><path fill-rule=\"evenodd\" d=\"M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z\" clip-rule=\"evenodd\" /></svg>'"></div>
+                </button>
+            </div>
+        </div>
+    </template>
 
-    {{-- Progress Bar --}}
-    @if ($toast->showProgressBar && ($config['progress_bar']['enabled'] ?? true) && $toast->duration > 0)
-    @php
-    // Resolve progress bar foreground color (type-specific override > global)
-    $progressBarTypeOverride = $config['progress_bar']['type_overrides'][$toast->type]['foreground'] ?? null;
-    $progressBarBg = $progressBarTypeOverride ?? $toast->progress_bar['bg'] ?? ($config['progress_bar']['background']['light'] ?? 'bg-black/10');
-
-    // Resolve progress bar height (type-specific override > global)
-    $progressBarHeightTypeOverride = $config['progress_bar']['type_overrides'][$toast->type]['height'] ?? null;
-    $progressBarHeight = $progressBarHeightTypeOverride ?? $config['progress_bar']['height'] ?? 'h-1';
-
-    // Resolve progress bar width (desktop vs. mobile)
-    $progressBarWidthDefault = $config['progress_bar']['width']['default'] ?? 'w-full';
-    $progressBarWidthMobile = $config['progress_bar']['width']['mobile'] ?? $progressBarWidthDefault;
-
-    $progressBarWidthClass = $progressBarWidthDefault;
-    if ($progressBarWidthDefault !== $progressBarWidthMobile) {
-    $progressBarWidthClass .= ' sm:' . $progressBarWidthMobile;
-    }
-
-    // Resolve progress bar transition properties
-    $progressBarTransitionProperty = $config['progress_bar']['transition']['property'] ?? 'width';
-    $progressBarTransitionTiming = $config['progress_bar']['transition']['timing'] ?? 'ease-linear';
-    $progressBarTransitionDuration = $config['progress_bar']['transition']['duration'] ?? 'duration-[--toast-duration]';
-    @endphp
-    <div
-        class="{{ $config['progress_bar']['base_class'] ?? 'overflow-hidden' }} {{ $progressBarHeight }} {{ $progressBarWidthClass }} {{ $progressBarBg }}">
+    <!-- Progress Bar -->
+    <template x-if="showProgressBar">
         <div
-            class="h-full {{ $toast->progress_bar['bg'] ?? $progressBarBg }}" {{-- Use toast's bg for foreground if specific isn't given --}}
-            :style="`width: ${progressBarWidth}%; transition: ${progressBarTransitionProperty} ${progressBarAnimationDuration} ${progressBarTransitionTiming}; animation-play-state: var(--toast-paused, running);`"
-            x-init="$watch('dismissed', val => { if (val) $el.style.width = '0%'; });" {{-- Animate to 0% on dismissal --}}></div>
-    </div>
-    @endif
+            :class="mainConfig.progress_bar?.base_class + ' ' + (mainConfig.progress_bar?.type_overrides?.[toastData.type]?.height || mainConfig.progress_bar?.height || 'h-1') + ' ' + (mainConfig.progress_bar?.background?.light || 'bg-black/10') + ' absolute bottom-0 left-0 right-0 rounded-b-lg'"
+            role="progressbar"
+            :aria-valuenow="progressBarWidth"
+            aria-valuemin="0"
+            aria-valuemax="100"
+        >
+            <div x-ref="progressBarInner"
+                 class="h-full rounded-b-lg"
+                 :class="mainConfig.progress_bar?.type_overrides?.[toastData.type]?.foreground || mainConfig.types?.[toastData.type]?.progress_bar?.bg || mainConfig.types?.defaults?.progress_bar?.bg || 'bg-blue-500'"
+                 :style="`width: ${progressBarWidth}%;`">
+            </div>
+        </div>
+    </template>
 </div>

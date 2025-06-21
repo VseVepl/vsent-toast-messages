@@ -1,111 +1,105 @@
-{{-- resources/views/toast-list.blade.php --}}
 {{--
-    This partial renders the list of toast messages within the main container.
-    It utilizes Alpine.js for transition animations as toasts are added or removed
-    from the Livewire component's `toasts` collection.
---}}
+    Renders the list of toast messages within the main container.
+    Located at: your-package-root/resources/views/toast-list.blade.php
+    Included by: 'laravel-toastify::container'
 
+    Uses Alpine.js for transitions and managing the list.
+    Receives $config from the parent view.
+    Entangles `toasts` with Livewire component's public `toastsForJs` property.
+--}}
 <div
     x-data="{
-        {{--
-            Initialize Alpine.js state for the toast list.
-            `toasts` is initialized with the Livewire component's `$toasts` data.
-            This `x-init` block ensures Alpine.js is aware of the initial toast state.
-        --}}
-        toasts: @entangle('toasts').live,
+        toasts: @entangle('toastsForJs').live,
+        config: {{ json_encode($config) }}, // Passed from container.blade.php
 
-        {{--
-            Sound playback function.
-            It checks if sounds are globally enabled and attempts to play the sound asset.
-            This is an in-browser audio playback, so paths must be relative to the public directory.
-        --}}
         playSound(soundPath, volume = 1.0, loop = false) {
-            if (!{{ json_encode($config['sounds']['global']['enabled'] ?? false) }}) {
+            if (!this.config.sounds?.global?.enabled || !soundPath) {
                 return;
             }
+            try {
+                let audio = new Audio(soundPath);
+                audio.volume = Math.min(1.0, Math.max(0.0, parseFloat(volume) || this.config.sounds.global.default_volume || 1.0));
+                audio.loop = loop || this.config.sounds.global.default_loop || false;
 
-            if (soundPath) {
-                try {
-                    let audio = new Audio(soundPath);
-                    audio.volume = Math.min(1.0, Math.max(0.0, volume)); // Clamp volume between 0 and 1
-                    audio.loop = loop;
-                    audio.play().catch(e => console.error('Error playing sound:', e));
-                } catch (e) {
-                    console.error('Failed to create audio object:', e);
+                if (this.constructor.lastSoundPlayedAt && (Date.now() - this.constructor.lastSoundPlayedAt < (this.config.sounds.global.throttle_ms || 50))) {
+                    return;
                 }
+                this.constructor.lastSoundPlayedAt = Date.now();
+
+                audio.play().catch(e => console.error('Laravel Toastify: Error playing sound:', e, 'Path:', soundPath));
+            } catch (e) {
+                console.error('Laravel Toastify: Failed to create audio object:', e);
             }
         },
 
-        {{--
-            Determine the correct stacking direction based on `reverse_order_on_stack` behavior.
-            This impacts where new toasts appear visually in a stack.
-        --}}
-        getStackingOrder() {
-            return {{ json_encode($config['behavior']['reverse_order_on_stack'] ?? false) }} ? 'top' : 'bottom';
+        getStackingClasses() {
+            const position = this.config.display?.position || 'bottom-right';
+            const reverseOrder = this.config.behavior?.reverse_order_on_stack || false;
+            let classes = ['flex', 'flex-col', 'w-full', 'space-y-3'];
+
+            if (position.includes('left')) classes.push('items-start');
+            else if (position.includes('right')) classes.push('items-end');
+            else if (position.includes('center')) classes.push('items-center');
+            else classes.push('items-end');
+
+            if (reverseOrder) {
+                if (position.startsWith('bottom-')) classes.push('flex-col-reverse');
+            } else {
+                if (position.startsWith('top-')) classes.push('flex-col-reverse');
+            }
+            return classes.join(' ');
         },
 
-        {{--
-            Initial setup on Alpine.js component initialization.
-            Play sounds for any toasts that are already present (e.g., on first load
-            or after a full page refresh if they were session-flashed).
-        --}}
         init() {
-            // Livewire will hydrate `toasts` automatically.
-            // When Livewire updates `toasts`, `x-for` handles reactivity.
-            // This `init` is primarily for playing sounds on initial load.
-            this.$watch('toasts', (newToasts, oldToasts) => {
-                const newToastIds = new Set(newToasts.map(toast => toast.id));
-                const oldToastIds = new Set(oldToasts.map(toast => toast.id));
-
-                newToasts.forEach(newToast => {
-                    if (!oldToastIds.has(newToast.id)) {
-                        // This is a new toast. Play its sound if configured.
-                        if (newToast.sound) {
-                            this.playSound(newToast.sound, newToast.soundVolume, newToast.soundLoop);
+            let knownToastIds = new Set(this.toasts.map(t => t.id));
+            this.$watch('toasts', (newToastsArray) => {
+                const currentToastIds = new Set();
+                newToastsArray.forEach(toast => {
+                    currentToastIds.add(toast.id);
+                    if (!knownToastIds.has(toast.id)) {
+                        if (toast.sound) {
+                            this.playSound(toast.sound, toast.soundVolume, toast.soundLoop);
                         }
+                        knownToastIds.add(toast.id);
                     }
                 });
+                knownToastIds.forEach(id => {
+                    if (!currentToastIds.has(id)) knownToastIds.delete(id);
+                });
             });
-
-            // Initial sound playback for toasts already present on mount
             this.toasts.forEach(toast => {
                 if (toast.sound) {
-                    this.playSound(toast.sound, toast.soundVolume, toast.soundLoop);
+                    setTimeout(() => this.playSound(toast.sound, toast.soundVolume, toast.soundLoop), 50);
                 }
             });
         }
     }"
-    class="pointer-events-auto flex flex-col w-full"
-    :class="{
-        'items-end': ['top-right', 'bottom-right'].includes('{{ $config['display']['position'] ?? 'bottom-right' }}'),
-        'items-start': ['top-left', 'bottom-left'].includes('{{ $config['display']['position'] ?? 'bottom-right' }}'),
-        'items-center': ['top-center', 'bottom-center'].includes('{{ $config['display']['position'] ?? 'bottom-right' }}'),
-        'space-y-reverse': getStackingOrder() === 'top' && ({{ json_encode($config['display']['position'] ?? 'bottom-right') }}.includes('bottom') || {{ json_encode($config['display']['mobile_position'] ?? 'bottom-right') }}.includes('bottom')),
-        'space-y-4': true {{-- Add spacing between toasts --}}
-    }">
-    {{--
-        x-for is used to iterate over the `toasts` array.
-        It uses x-transition directives to animate toasts when they enter or leave the DOM.
-        Each toast is rendered using the `toast.blade.php` component.
-    --}}
+    @play-sound-event.window="playSound($event.detail.path, $event.detail.volume, $event.detail.loop)"
+    :class="getStackingClasses()"
+    class="pointer-events-auto"
+>
     <template x-for="toast in toasts" :key="toast.id">
         <div
-            {{-- Dynamically apply enter/leave transition classes based on the toast's animation preset --}}
-            x-transition:enter="{{ $config['animations']['global']['default_transition_classes'] ?? 'transition' }}"
-            :x-transition:enter-start="toast.animation.enter_from"
-            :x-transition:enter-end="toast.animation.enter_to"
-            :x-transition:enter-duration="toast.animation.enter_duration"
-            :x-transition:enter-ease="toast.animation.enter_easing"
-
-            x-transition:leave="{{ $config['animations']['global']['default_transition_classes'] ?? 'transition' }}"
-            :x-transition:leave-start="toast.animation.leave_from"
-            :x-transition:leave-end="toast.animation.leave_to"
-            :x-transition:leave-duration="toast.animation.leave_duration"
-            :x-transition:leave-ease="toast.animation.leave_easing"
-
-            {{-- Optional transform origin for scale animations --}}
-            :style="toast.animation.transform_origin ? `transform-origin: ${toast.animation.transform_origin}` : ''">
-            @include('toast-messages::components.toast', ['toast' => $toast, 'config' => $config])
+            x-transition:enter-start="toast.animation?.enter_from || config.animations?.presets?.[config.animations?.preset]?.enter_from || 'opacity-0'"
+            x-transition:enter-end="toast.animation?.enter_to || config.animations?.presets?.[config.animations?.preset]?.enter_to || 'opacity-100'"
+            x-transition:leave-start="toast.animation?.leave_from || config.animations?.presets?.[config.animations?.preset]?.leave_from || 'opacity-100'"
+            x-transition:leave-end="toast.animation?.leave_to || config.animations?.presets?.[config.animations?.preset]?.leave_to || 'opacity-0'"
+            class="transition"
+            :style="`
+                transition-duration: ${toast.animation?.enter_duration || config.animations?.global?.default_enter_duration || 300}ms;
+                transition-timing-function: ${toast.animation?.enter_easing || config.animations?.global?.default_enter_easing || 'ease-out'};
+                ${toast.animation?.transform_origin ? 'transform-origin: ' + toast.animation.transform_origin + ';' : ''}
+            `"
+            x-on:mouseleave="
+                if (toast.animation?.leave_duration) $el.style.transitionDuration = `${toast.animation?.leave_duration || config.animations?.global?.default_leave_duration || 200}ms`;
+                if (toast.animation?.leave_easing) $el.style.transitionTimingFunction = toast.animation?.leave_easing || config.animations?.global?.default_leave_easing || 'ease-in';
+            "
+        >
+            {{-- Use the package's view namespace for the component --}}
+            @include('laravel-toastify::components.toast', [
+                'config' => $config // Pass the main config object
+                                     // Alpine's `toast` from x-for will be in scope in the included partial
+            ])
         </div>
     </template>
 </div>
