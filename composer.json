@@ -1,0 +1,72 @@
+{
+    "name": "vsent/toast-messages",
+    "description": "A Laravel package for Livewire-powered, priority-based toast notifications with dynamic display limits and rich UI/UX features.",
+    "keywords": [
+        "laravel",
+        "livewire",
+        "toast",
+        "notifications",
+        "alpinejs",
+        "tailwind",
+        "ux",
+        "priority"
+    ],
+    "type": "laravel-package",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Avinash Ban",
+            "email": "a7507980750@gmail.com"
+        }
+    ],
+    "version": "1.0.0",
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^10.0|^11.0|^12.0",
+        "illuminate/session": "^10.0|^11.0|^12.0",
+        "illuminate/config": "^10.0|^11.0|^12.0",
+        "illuminate/events": "^10.0|^11.0|^12.0",
+        "illuminate/console": "^10.0|^11.0|^12.0",
+        "livewire/livewire": "^3.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
+        "phpunit/phpunit": "^10.0|^11.0",
+        "mockery/mockery": "^1.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "Vsent\\ToastMessages\\": "src/"
+        },
+        "files": [
+            "src/helpers.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Vsent\\ToastMessages\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Vsent\\ToastMessages\\ToastServiceProvider"
+            ],
+            "aliases": {
+                "Toast": "Vsent\\ToastMessages\\Facades\\Toast"
+            }
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
+    }
+}
